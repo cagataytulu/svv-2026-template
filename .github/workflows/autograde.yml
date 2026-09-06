@@ -1,0 +1,73 @@
+# .github/workflows/autograde.yml
+#
+# HOW TO USE:
+# 1. Put this file inside each project's repo at: .github/workflows/autograde.yml
+# 2. It runs automatically every time a student pushes code (no action needed from you).
+# 3. Results (coverage %, mutation score) are saved as a downloadable "artifact"
+#    on the repo's Actions tab — you just glance at the numbers, no manual reading needed.
+# 4. Adjust the `--fail-under` threshold to whatever minimum you require for full credit.
+#
+# ASSUMPTIONS (adjust to your project structure):
+# - Python project
+# - Source code lives in `src/`
+# - Tests live in `tests/` and use pytest
+
+name: Autograde V&V Project
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # lets you (or students) trigger it manually too
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest coverage mutmut
+
+      - name: Run tests with coverage
+        run: |
+          coverage run -m pytest tests/ --junitxml=test-results.xml
+          coverage report -m
+          coverage json -o coverage.json
+        continue-on-error: true   # so the workflow still uploads results even if some tests fail
+
+      - name: Check coverage threshold (adjust % as needed)
+        run: |
+          coverage report --fail-under=70
+
+      - name: Run mutation testing
+        run: |
+          mutmut run --paths-to-mutate=src/ || true
+          mutmut results > mutmut_results.txt
+          mutmut junitxml > mutmut_results.xml || true
+
+      - name: Upload grading artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: grading-results
+          path: |
+            coverage.json
+            test-results.xml
+            mutmut_results.txt
+
+      # OPTIONAL: post a short summary directly into the Actions run log
+      # so you can see pass/fail at a glance without downloading anything
+      - name: Print summary
+        if: always()
+        run: |
+          echo "### Autograde Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage report:" >> $GITHUB_STEP_SUMMARY
+          coverage report >> $GITHUB_STEP_SUMMARY || true
+          echo "Mutation results:" >> $GITHUB_STEP_SUMMARY
+          cat mutmut_results.txt >> $GITHUB_STEP_SUMMARY || true

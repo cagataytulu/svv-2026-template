@@ -15,9 +15,7 @@
 name: Autograde V&V Project
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:   # lets you (or students) trigger it manually too
+  workflow_dispatch:   # temporarily manual-only until the Week 4 checkpoint
 
 jobs:
   grade:
